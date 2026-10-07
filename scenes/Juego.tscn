@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://b4kyeudx0iy35"]
+
+[ext_resource type="Script" uid="uid://d0771ua6mtcrg" path="res://scripts/Juego.gd" id="1_5wx1s"]
+
+[node name="Juego" type="Control" unique_id=644527700]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_5wx1s")
+
+[node name="Fondo" type="ColorRect" parent="." unique_id=408352318]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 1152.0
+offset_bottom = 648.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.34622666, 0.46, 0.21620002, 1)
