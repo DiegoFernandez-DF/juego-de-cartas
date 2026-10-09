@@ -12,8 +12,52 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_right = 1152.0
-offset_bottom = 648.0
+offset_right = 1980.0
+offset_bottom = 1080.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.34622666, 0.46, 0.21620002, 1)
+color = Color(0.34509805, 0.45882353, 0.21568628, 1)
+
+[node name="Tablero" type="Control" parent="." unique_id=2067613585]
+anchors_preset = 0
+offset_left = 50.0
+offset_top = 200.0
+offset_right = 90.0
+offset_bottom = 240.0
+
+[node name="Fundaciones" type="Control" parent="." unique_id=884911712]
+anchors_preset = 0
+offset_left = 520.0
+offset_top = 30.0
+offset_right = 560.0
+offset_bottom = 70.0
+
+[node name="Fundacion1" type="ColorRect" parent="Fundaciones" unique_id=278847436]
+layout_mode = 0
+offset_right = 100.0
+offset_bottom = 149.0
+
+[node name="Fundacion2" type="ColorRect" parent="Fundaciones" unique_id=1706335369]
+layout_mode = 0
+offset_left = 150.0
+offset_right = 250.0
+offset_bottom = 149.0
+
+[node name="Fundacion3" type="ColorRect" parent="Fundaciones" unique_id=1423211477]
+layout_mode = 0
+offset_left = 300.0
+offset_right = 400.0
+offset_bottom = 149.0
+
+[node name="Fundacion4" type="ColorRect" parent="Fundaciones" unique_id=1916241104]
+layout_mode = 0
+offset_left = 450.0
+offset_right = 550.0
+offset_bottom = 149.0
+
+[node name="Mano" type="Control" parent="." unique_id=1348098942]
+anchors_preset = 0
+offset_left = 50.0
+offset_top = 600.0
+offset_right = 90.0
+offset_bottom = 640.0

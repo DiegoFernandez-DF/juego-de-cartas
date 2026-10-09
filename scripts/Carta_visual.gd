@@ -10,9 +10,6 @@ func configurar(p_carta: Carta) -> void:
 
 
 func actualizar_visual() -> void:
-	var texto = obtener_texto_valor() + " " + obtener_simbolo_palo()
-	$Texto.text = texto
-
 	actualizar_ilustracion()
 	actualizar_dorso()
 
@@ -20,6 +17,9 @@ func actualizar_visual() -> void:
 func actualizar_ilustracion() -> void:
 	var ruta = obtener_ruta_ilustracion()
 	var textura = load(ruta) as Texture2D
+
+	$Ilustracion.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	$Ilustracion.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 
 	$Ilustracion.texture = textura
 	$Ilustracion.visible = carta.visible
@@ -62,31 +62,3 @@ func obtener_nombre_carta() -> String:
 			return "K"
 		_:
 			return str(carta.valor)
-
-
-func obtener_texto_valor() -> String:
-	match carta.valor:
-		1:
-			return "A"
-		11:
-			return "J"
-		12:
-			return "Q"
-		13:
-			return "K"
-		_:
-			return str(carta.valor)
-
-
-func obtener_simbolo_palo() -> String:
-	match carta.palo:
-		Carta.Palo.CORAZONES:
-			return "♥"
-		Carta.Palo.DIAMANTES:
-			return "♦"
-		Carta.Palo.TREBOLES:
-			return "♣"
-		Carta.Palo.PICAS:
-			return "♠"
-
-	return ""
