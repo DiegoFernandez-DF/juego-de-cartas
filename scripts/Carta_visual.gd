@@ -82,7 +82,8 @@ func _get_drag_data(posicion: Vector2) -> Variant:
 		"zona_origen": zona,
 		"indice_columna": indice_columna,
 		"indice_carta": indice_carta,
-		"carta": carta
+		"carta": carta,
+		"nodo_origen": self
 	}
 
 	var vista_previa = duplicate() as Control
@@ -119,15 +120,37 @@ func _notification(que: int) -> void:
 		visible = true
 
 
+
 func _can_drop_data(
 	_posicion: Vector2,
 	datos: Variant
 ) -> bool:
-	return (
-		datos is Dictionary
-		and datos.has("carta")
-		and datos["carta"] is Carta
-	)
+	if not datos is Dictionary:
+		return false
+
+	if not datos.has("carta"):
+		return false
+
+	if not datos.has("nodo_origen"):
+		return false
+
+	if zona != "tablero":
+		return false
+
+	if datos["zona_origen"] != "mano":
+		return false
+
+	if indice_columna < 0 or indice_columna >= 7:
+		return false
+
+	if not datos["carta"] is Carta:
+		return false
+
+	if not carta.visible:
+		return false
+
+	return true
+
 
 
 func _drop_data(_posicion: Vector2, datos: Variant) -> void:
