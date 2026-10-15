@@ -141,6 +141,14 @@ func mostrar_tablero() -> void:
 			).instantiate()
 
 			carta_visual.configurar(carta)
+
+			carta_visual.zona = "tablero"
+			carta_visual.indice_columna = numero_columna
+			carta_visual.indice_carta = numero_carta
+			carta_visual.solicitar_movimiento.connect(
+				mover_carta
+			)
+
 			$Tablero.add_child(carta_visual)
 
 			carta_visual.size = TAMANO_CARTA
@@ -149,6 +157,8 @@ func mostrar_tablero() -> void:
 				numero_columna * SEPARACION_COLUMNAS,
 				numero_carta * SEPARACION_VERTICAL_TABLERO
 			)
+			
+			carta_visual.z_index = numero_carta
 
 
 func mostrar_mano() -> void:
@@ -160,6 +170,13 @@ func mostrar_mano() -> void:
 		).instantiate()
 
 		carta_visual.configurar(carta)
+
+		carta_visual.zona = "mano"
+		carta_visual.indice_carta = numero_carta
+		carta_visual.solicitar_movimiento.connect(
+			mover_carta
+		)
+
 		$Mano.add_child(carta_visual)
 
 		carta_visual.size = TAMANO_CARTA
@@ -170,3 +187,93 @@ func mostrar_mano() -> void:
 		)
 
 		carta_visual.z_index = numero_carta
+
+
+func mover_carta(
+	datos_arrastre: Dictionary,
+	destino: Control
+) -> void:
+	if datos_arrastre["zona_origen"] != "mano":
+		return
+
+	if destino.zona != "tablero":
+		return
+
+	var indice_columna = destino.indice_columna
+	var columna = partida.columnas[indice_columna]
+
+	# Por ahora solo se permite soltar sobre la última carta.
+	if destino.indice_carta != columna.cartas.size() - 1:
+		return
+
+	var carta_movida: Carta = datos_arrastre["carta"]
+	var carta_destino: Carta = destino.carta
+
+	# La carta movida debe tener un valor inferior.
+	if carta_movida.valor != carta_destino.valor - 1:
+		return
+
+	# Las cartas deben ser de colores alternados.
+	if es_roja(carta_movida) == es_roja(carta_destino):
+		return
+
+	var nodo_origen: Control = datos_arrastre["nodo_origen"]
+
+	# Actualizar el modelo.
+	partida.mano.cartas.erase(carta_movida)
+	columna.cartas.append(carta_movida)
+
+	# Mover el nodo visual a la zona del tablero.
+	nodo_origen.get_parent().remove_child(nodo_origen)
+	$Tablero.add_child(nodo_origen)
+
+	nodo_origen.zona = "tablero"
+	nodo_origen.visible = true
+
+	actualizar_vista_tablero()
+	actualizar_indices_mano()
+
+	# Recalcular la posición de las cartas restantes de la Mano.
+	actualizar_indices_mano()
+
+
+func es_roja(carta: Carta) -> bool:
+	return (
+		carta.palo == Carta.Palo.CORAZONES
+		or carta.palo == Carta.Palo.DIAMANTES
+	)
+
+
+func actualizar_indices_mano() -> void:
+	for i in range($Mano.get_child_count()):
+		var carta_visual = $Mano.get_child(i)
+
+		carta_visual.indice_carta = i
+		carta_visual.position = Vector2(
+			i * SEPARACION_MANO,
+			0
+		)
+		carta_visual.z_index = i
+
+
+func actualizar_vista_tablero() -> void:
+	for numero_columna in range(partida.columnas.size()):
+		var columna = partida.columnas[numero_columna]
+
+		for numero_carta in range(columna.cartas.size()):
+			var carta = columna.cartas[numero_carta]
+
+			for nodo in $Tablero.get_children():
+				if nodo is Control and nodo.carta == carta:
+					nodo.zona = "tablero"
+					nodo.indice_columna = numero_columna
+					nodo.indice_carta = numero_carta
+
+					nodo.position = Vector2(
+						numero_columna * SEPARACION_COLUMNAS,
+						numero_carta * SEPARACION_VERTICAL_TABLERO
+					)
+
+					nodo.z_index = numero_carta
+					nodo.visible = true
+					break
