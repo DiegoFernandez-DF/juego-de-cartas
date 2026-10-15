@@ -1,7 +1,14 @@
+
 extends Control
 
 
+signal solicitar_movimiento(datos_arrastre: Dictionary, destino: Control)
+
+
 var carta: Carta
+var zona: String
+var indice_columna: int = -1
+var indice_carta: int = -1
 
 
 func configurar(p_carta: Carta) -> void:
@@ -33,7 +40,10 @@ func obtener_ruta_ilustracion() -> String:
 	var carpeta_palo = obtener_carpeta_palo()
 	var nombre_carta = obtener_nombre_carta()
 
-	return "res://assets/cartas/%s/%s.png" % [carpeta_palo, nombre_carta]
+	return "res://assets/cartas/%s/%s.png" % [
+		carpeta_palo,
+		nombre_carta
+	]
 
 
 func obtener_carpeta_palo() -> String:
@@ -62,3 +72,63 @@ func obtener_nombre_carta() -> String:
 			return "K"
 		_:
 			return str(carta.valor)
+
+
+func _get_drag_data(posicion: Vector2) -> Variant:
+	if not carta.visible:
+		return null
+
+	var datos_arrastre = {
+		"zona_origen": zona,
+		"indice_columna": indice_columna,
+		"indice_carta": indice_carta,
+		"carta": carta
+	}
+
+	var vista_previa = duplicate() as Control
+
+	vista_previa.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	vista_previa.position = Vector2.ZERO
+	vista_previa.size = size
+	vista_previa.custom_minimum_size = size
+	vista_previa.scale = Vector2.ONE
+	vista_previa.rotation = 0.0
+	vista_previa.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	for hijo in vista_previa.get_children():
+		if hijo is Control:
+			hijo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var contenedor = Control.new()
+	contenedor.size = size
+	contenedor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	vista_previa.position = -posicion
+	contenedor.add_child(vista_previa)
+
+	set_drag_preview(contenedor)
+
+	visible = false
+
+	return datos_arrastre
+	
+
+
+func _notification(que: int) -> void:
+	if que == NOTIFICATION_DRAG_END:
+		visible = true
+
+
+func _can_drop_data(
+	_posicion: Vector2,
+	datos: Variant
+) -> bool:
+	return (
+		datos is Dictionary
+		and datos.has("carta")
+		and datos["carta"] is Carta
+	)
+
+
+func _drop_data(_posicion: Vector2, datos: Variant) -> void:
+	solicitar_movimiento.emit(datos, self)
