@@ -9,6 +9,7 @@ var carta: Carta
 var zona: String
 var indice_columna: int = -1
 var indice_carta: int = -1
+var nodos_arrastrados: Array[Control] = []
 
 
 func configurar(p_carta: Carta) -> void:
@@ -74,51 +75,104 @@ func obtener_nombre_carta() -> String:
 			return str(carta.valor)
 
 
-func _get_drag_data(posicion: Vector2) -> Variant:
+func _get_drag_data(_posicion: Vector2) -> Variant:
 	if not carta.visible:
+		return null
+
+	var cartas_movidas: Array[Carta] = []
+	nodos_arrastrados.clear()
+	var indice_seleccionado := indice_carta
+
+	if zona == "tablero":
+		var juego = get_parent().get_parent()
+		var tablero = juego.get_node("Tablero")
+		var columna = juego.partida.columnas[indice_columna]
+
+		var posicion_tablero = (
+			tablero.get_global_transform_with_canvas().affine_inverse()
+			* get_global_mouse_position()
+		)
+
+		indice_seleccionado = juego.obtener_carta_seleccionada(
+			columna,
+			posicion_tablero.y
+		)
+
+		if indice_seleccionado < 0:
+			return null
+
+		for i in range(indice_seleccionado, columna.cartas.size()):
+			var carta_secuencia: Carta = columna.cartas[i]
+			cartas_movidas.append(carta_secuencia)
+
+			for nodo in tablero.get_children():
+				if nodo is Control and nodo.carta == carta_secuencia:
+					nodos_arrastrados.append(nodo)
+					break
+
+	elif zona == "mano":
+		cartas_movidas.append(carta)
+		nodos_arrastrados.append(self)
+
+	else:
+		return null
+
+	if cartas_movidas.is_empty():
+		return null
+
+	if cartas_movidas.size() != nodos_arrastrados.size():
 		return null
 
 	var datos_arrastre = {
 		"zona_origen": zona,
 		"indice_columna": indice_columna,
-		"indice_carta": indice_carta,
-		"carta": carta,
+		"indice_carta": indice_seleccionado,
+		"carta": cartas_movidas[0],
+		"cartas_movidas": cartas_movidas,
+		"nodos_movidos": nodos_arrastrados.duplicate(),
 		"nodo_origen": self
 	}
 
-	var vista_previa = duplicate() as Control
-
-	vista_previa.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	vista_previa.position = Vector2.ZERO
-	vista_previa.size = size
-	vista_previa.custom_minimum_size = size
-	vista_previa.scale = Vector2.ONE
-	vista_previa.rotation = 0.0
-	vista_previa.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	for hijo in vista_previa.get_children():
-		if hijo is Control:
-			hijo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
 	var contenedor = Control.new()
-	contenedor.size = size
 	contenedor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	vista_previa.position = -posicion
-	contenedor.add_child(vista_previa)
+	var altura_previa = size.y + (cartas_movidas.size() - 1) * 35
+	contenedor.size = Vector2(size.x, altura_previa)
+
+	for i in range(nodos_arrastrados.size()):
+		var vista_previa = nodos_arrastrados[i].duplicate() as Control
+		vista_previa.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		vista_previa.position = Vector2(
+			-_posicion.x,
+			i * 35 - _posicion.y
+		)
+		vista_previa.size = size
+		vista_previa.custom_minimum_size = size
+		vista_previa.scale = Vector2.ONE
+		vista_previa.rotation = 0.0
+		vista_previa.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		for hijo in vista_previa.get_children():
+			if hijo is Control:
+				hijo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		contenedor.add_child(vista_previa)
 
 	set_drag_preview(contenedor)
 
-	visible = false
+	for nodo in nodos_arrastrados:
+		nodo.visible = false
 
 	return datos_arrastre
-	
 
 
 func _notification(que: int) -> void:
 	if que == NOTIFICATION_DRAG_END:
-		visible = true
+		for nodo in nodos_arrastrados:
+			if is_instance_valid(nodo):
+				nodo.visible = true
 
+		nodos_arrastrados.clear()
 
 
 func _can_drop_data(
@@ -128,29 +182,30 @@ func _can_drop_data(
 	if not datos is Dictionary:
 		return false
 
-	if not datos.has("carta"):
+	if not datos.has("cartas_movidas"):
 		return false
 
-	if not datos.has("nodo_origen"):
+	if not datos.has("nodos_movidos"):
 		return false
 
 	if zona != "tablero":
 		return false
 
-	if datos["zona_origen"] != "mano":
+	if datos["zona_origen"] != "mano" \
+	and datos["zona_origen"] != "tablero":
 		return false
+
+	if datos["zona_origen"] == "tablero":
+		if datos["indice_columna"] == indice_columna:
+			return false
 
 	if indice_columna < 0 or indice_columna >= 7:
-		return false
-
-	if not datos["carta"] is Carta:
 		return false
 
 	if not carta.visible:
 		return false
 
 	return true
-
 
 
 func _drop_data(_posicion: Vector2, datos: Variant) -> void:

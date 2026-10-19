@@ -193,47 +193,101 @@ func mover_carta(
 	datos_arrastre: Dictionary,
 	destino: Control
 ) -> void:
-	if datos_arrastre["zona_origen"] != "mano":
-		return
+	var zona_origen: String = datos_arrastre["zona_origen"]
+	var cartas_movidas: Array[Carta] = datos_arrastre["cartas_movidas"]
+	var nodos_movidos: Array = datos_arrastre["nodos_movidos"]
 
 	if destino.zona != "tablero":
 		return
 
-	var indice_columna = destino.indice_columna
-	var columna = partida.columnas[indice_columna]
-
-	# Por ahora solo se permite soltar sobre la última carta.
-	if destino.indice_carta != columna.cartas.size() - 1:
+	if cartas_movidas.is_empty():
 		return
 
-	var carta_movida: Carta = datos_arrastre["carta"]
-	var carta_destino: Carta = destino.carta
+	var indice_destino: int = destino.indice_columna
+	var columna_destino = partida.columnas[indice_destino]
 
-	# La carta movida debe tener un valor inferior.
-	if carta_movida.valor != carta_destino.valor - 1:
+	# Por ahora no se permiten movimientos hacia columnas vacías.
+	if columna_destino.cartas.is_empty():
 		return
 
-	# Las cartas deben ser de colores alternados.
-	if es_roja(carta_movida) == es_roja(carta_destino):
+	var carta_inicial: Carta = cartas_movidas[0]
+	var carta_destino: Carta = columna_destino.cartas.back()
+
+	# La primera carta debe colocarse sobre un valor inmediatamente superior.
+	if carta_destino.valor != carta_inicial.valor + 1:
 		return
 
-	var nodo_origen: Control = datos_arrastre["nodo_origen"]
+	# Los colores entre la secuencia y el destino deben alternarse.
+	if es_roja(carta_inicial) == es_roja(carta_destino):
+		return
 
-	# Actualizar el modelo.
-	partida.mano.cartas.erase(carta_movida)
-	columna.cartas.append(carta_movida)
+	# Comprobar que toda la secuencia respete las reglas de Klondike.
+	for i in range(1, cartas_movidas.size()):
+		var carta_anterior: Carta = cartas_movidas[i - 1]
+		var carta_actual: Carta = cartas_movidas[i]
 
-	# Mover el nodo visual a la zona del tablero.
-	nodo_origen.get_parent().remove_child(nodo_origen)
-	$Tablero.add_child(nodo_origen)
+		if carta_actual.valor != carta_anterior.valor - 1:
+			return
 
-	nodo_origen.zona = "tablero"
-	nodo_origen.visible = true
+		if es_roja(carta_actual) == es_roja(carta_anterior):
+			return
+
+	var columna_origen = null
+
+	if zona_origen == "tablero":
+		var indice_origen: int = datos_arrastre["indice_columna"]
+		var indice_carta_origen: int = datos_arrastre["indice_carta"]
+
+		columna_origen = partida.columnas[indice_origen]
+
+		if columna_origen == columna_destino:
+			return
+
+		# Comprobar que la secuencia seleccionada sea el tramo final
+		# de la columna de origen.
+		if indice_carta_origen < 0:
+			return
+
+		if indice_carta_origen + cartas_movidas.size() != columna_origen.cartas.size():
+			return
+
+		for i in range(cartas_movidas.size()):
+			if columna_origen.cartas[indice_carta_origen + i] != cartas_movidas[i]:
+				return
+
+		# Retirar todas las cartas seleccionadas de la columna.
+		for i in range(cartas_movidas.size()):
+			columna_origen.cartas.pop_back()
+
+	elif zona_origen == "mano":
+		if cartas_movidas.size() != 1:
+			return
+
+		partida.mano.cartas.erase(cartas_movidas[0])
+
+		# La carta visual debe pasar de la Mano al Tablero.
+		var nodo_origen: Control = nodos_movidos[0]
+		nodo_origen.get_parent().remove_child(nodo_origen)
+		$Tablero.add_child(nodo_origen)
+
+	else:
+		return
+
+	# Agregar todas las cartas conservando su orden.
+	for carta in cartas_movidas:
+		columna_destino.cartas.append(carta)
+
+	# Revelar la nueva carta superior de la columna de origen.
+	if zona_origen == "tablero" and not columna_origen.cartas.is_empty():
+		var carta_superior: Carta = columna_origen.cartas.back()
+		carta_superior.revelar()
+
+		for nodo in $Tablero.get_children():
+			if nodo is Control and nodo.carta == carta_superior:
+				nodo.actualizar_visual()
+				break
 
 	actualizar_vista_tablero()
-	actualizar_indices_mano()
-
-	# Recalcular la posición de las cartas restantes de la Mano.
 	actualizar_indices_mano()
 
 
@@ -277,3 +331,17 @@ func actualizar_vista_tablero() -> void:
 					nodo.z_index = numero_carta
 					nodo.visible = true
 					break
+
+
+func obtener_carta_seleccionada(
+	columna: Columna,
+	posicion_y: float
+) -> int:
+	for i in range(columna.cartas.size() - 1, -1, -1):
+		var inicio_y := i * SEPARACION_VERTICAL_TABLERO
+		var fin_y := inicio_y + TAMANO_CARTA.y
+
+		if posicion_y >= inicio_y and posicion_y < fin_y:
+			return i
+
+	return -1
