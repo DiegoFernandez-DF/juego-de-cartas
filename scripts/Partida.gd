@@ -13,10 +13,8 @@ func _init():
 	for i in range(7):
 		columnas.append(Columna.new())
 
-	for palo in Carta.Palo.values():
-		var fundacion = Fundacion.new()
-		fundacion.palo = palo
-		fundaciones.append(fundacion)
+	for i in range(4):
+		fundaciones.append(Fundacion.new())
 
 
 func generar_cartas() -> void:

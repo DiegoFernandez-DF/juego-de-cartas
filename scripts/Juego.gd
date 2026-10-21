@@ -22,6 +22,10 @@ const DESPLAZAMIENTO_X_FUNDACIONES = -287
 const DESPLAZAMIENTO_X_TABLERO = 0
 const DESPLAZAMIENTO_X_MANO = 0
 
+# Ajuste fino de las cartas dentro de cada fundacion.
+# Positivo = hacia la derecha / abajo. Negativo = izquierda / arriba.
+const AJUSTE_CARTA_FUNDACION = Vector2(0, 0)
+
 
 var partida: Partida
 
@@ -69,6 +73,11 @@ func configurar_fundaciones(tamano_pantalla: Vector2) -> void:
 		var fundacion = $Fundaciones.get_node(
 			nombres_fundaciones[numero_fundacion]
 		)
+		
+		fundacion.set_script(preload("res://scripts/Fundacion_visual.gd"))
+		fundacion.indice_fundacion = numero_fundacion
+		fundacion.mouse_filter = Control.MOUSE_FILTER_STOP
+		fundacion.solicitar_movimiento.connect(mover_a_fundacion)
 
 		fundacion.size = Vector2(
 			TAMANO_CARTA.x - 15,
@@ -285,6 +294,84 @@ func mover_carta(
 		for nodo in $Tablero.get_children():
 			if nodo is Control and nodo.carta == carta_superior:
 				nodo.actualizar_visual()
+				break
+
+	actualizar_vista_tablero()
+	actualizar_indices_mano()
+
+
+func mover_a_fundacion(
+	datos_arrastre: Dictionary,
+	destino: Control
+) -> void:
+	var zona_origen: String = datos_arrastre["zona_origen"]
+	var cartas_movidas: Array[Carta] = datos_arrastre["cartas_movidas"]
+	var nodos_movidos: Array = datos_arrastre["nodos_movidos"]
+
+	# Hacia una fundacion solo se mueve una carta por vez.
+	if cartas_movidas.size() != 1 or nodos_movidos.size() != 1:
+		return
+
+	var carta: Carta = cartas_movidas[0]
+	var fundacion: Fundacion = partida.fundaciones[destino.indice_fundacion]
+
+	if not fundacion.puede_recibir(carta):
+		return
+
+	var columna_origen: Columna = null
+
+	if zona_origen == "tablero":
+		columna_origen = partida.columnas[datos_arrastre["indice_columna"]]
+
+		# La carta debe ser la ultima de su columna.
+		if columna_origen.cartas.is_empty():
+			return
+
+		if columna_origen.cartas.back() != carta:
+			return
+
+		columna_origen.cartas.pop_back()
+
+	elif zona_origen == "mano":
+		partida.mano.cartas.erase(carta)
+
+	else:
+		return
+
+	fundacion.agregar_carta(carta)
+
+	# La carta visual pasa a la fundacion de destino.
+	var nodo: Control = nodos_movidos[0]
+	nodo.get_parent().remove_child(nodo)
+	destino.add_child(nodo)
+
+	nodo.zona = "fundacion"
+	nodo.indice_columna = -1
+	nodo.indice_carta = fundacion.cartas.size() - 1
+	nodo.size = TAMANO_CARTA
+	nodo.position = (
+		(destino.size - TAMANO_CARTA) / 2.0
+		+ AJUSTE_CARTA_FUNDACION
+	)
+	nodo.z_index = 0
+	nodo.visible = true
+
+	# Las cartas de una fundacion no se vuelven a usar: que no
+	# capturen el mouse para que la fundacion siga recibiendo cartas.
+	nodo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	for hijo in nodo.get_children():
+		if hijo is Control:
+			hijo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Revelar la nueva carta superior de la columna de origen.
+	if columna_origen != null and not columna_origen.cartas.is_empty():
+		var carta_superior: Carta = columna_origen.cartas.back()
+		carta_superior.revelar()
+
+		for otro_nodo in $Tablero.get_children():
+			if otro_nodo is Control and otro_nodo.carta == carta_superior:
+				otro_nodo.actualizar_visual()
 				break
 
 	actualizar_vista_tablero()
