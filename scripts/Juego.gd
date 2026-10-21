@@ -40,6 +40,7 @@ func _ready():
 	crear_zonas_columnas()
 	mostrar_tablero()
 	mostrar_mano()
+	crear_botones_interfaz()
 
 
 func configurar_distribucion() -> void:
@@ -460,6 +461,126 @@ func verificar_fin_partida() -> void:
 
 	if analisis["resultado"] == Analizador.Resultado.SIN_PROGRESO:
 		mostrar_resultado("Partida bloqueada")
+
+
+func crear_botones_interfaz() -> void:
+	# Capa propia por debajo del cartel de resultado.
+	var capa := CanvasLayer.new()
+	capa.layer = 5
+	add_child(capa)
+
+	# Abajo a la izquierda: acciones de la partida.
+	var panel_izquierdo := VBoxContainer.new()
+	panel_izquierdo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	capa.add_child(panel_izquierdo)
+	_anclar_abajo(panel_izquierdo, false)
+
+	panel_izquierdo.add_child(
+		_crear_boton("Nueva partida", confirmar_nueva_partida)
+	)
+
+	# Abajo a la derecha: ordenamiento de la mano.
+	var panel_derecho := GridContainer.new()
+	panel_derecho.columns = 2
+	panel_derecho.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	capa.add_child(panel_derecho)
+	_anclar_abajo(panel_derecho, true)
+
+	panel_derecho.add_child(_crear_boton(
+		"Corazones", _ordenar_mano_por_palo.bind(Carta.Palo.CORAZONES)
+	))
+	panel_derecho.add_child(_crear_boton(
+		"Diamantes", _ordenar_mano_por_palo.bind(Carta.Palo.DIAMANTES)
+	))
+	panel_derecho.add_child(_crear_boton(
+		"Tréboles", _ordenar_mano_por_palo.bind(Carta.Palo.TREBOLES)
+	))
+	panel_derecho.add_child(_crear_boton(
+		"Picas", _ordenar_mano_por_palo.bind(Carta.Palo.PICAS)
+	))
+	panel_derecho.add_child(_crear_boton(
+		"Rojas primero", _ordenar_mano_por_color.bind(true)
+	))
+	panel_derecho.add_child(_crear_boton(
+		"Negras primero", _ordenar_mano_por_color.bind(false)
+	))
+	panel_derecho.add_child(_crear_boton(
+		"Por número", _ordenar_mano_por_numero
+	))
+
+
+func _crear_boton(texto: String, accion: Callable) -> Button:
+	var boton := Button.new()
+	boton.text = texto
+	boton.custom_minimum_size = Vector2(150, 40)
+	boton.focus_mode = Control.FOCUS_NONE
+	boton.pressed.connect(accion)
+	return boton
+
+
+# Pega un contenedor a la esquina inferior izquierda o derecha.
+func _anclar_abajo(control: Control, derecha: bool) -> void:
+	var margen: float = 20.0
+	var ancla_x: float = 1.0 if derecha else 0.0
+
+	control.anchor_left = ancla_x
+	control.anchor_right = ancla_x
+	control.anchor_top = 1.0
+	control.anchor_bottom = 1.0
+
+	if derecha:
+		control.offset_left = -margen
+		control.offset_right = -margen
+		control.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	else:
+		control.offset_left = margen
+		control.offset_right = margen
+		control.grow_horizontal = Control.GROW_DIRECTION_END
+
+	control.offset_top = -margen
+	control.offset_bottom = -margen
+	control.grow_vertical = Control.GROW_DIRECTION_BEGIN
+
+
+func _ordenar_mano_por_numero() -> void:
+	partida.mano.ordenar_por_numero()
+	reordenar_mano_visual()
+
+
+func _ordenar_mano_por_color(rojas_primero: bool) -> void:
+	partida.mano.ordenar_por_color(rojas_primero)
+	reordenar_mano_visual()
+
+
+func _ordenar_mano_por_palo(palo: Carta.Palo) -> void:
+	partida.mano.ordenar_por_palo(palo)
+	reordenar_mano_visual()
+
+
+# Acomoda las cartas visuales de la mano segun el orden del modelo.
+func reordenar_mano_visual() -> void:
+	for i in range(partida.mano.cartas.size()):
+		var carta: Carta = partida.mano.cartas[i]
+
+		for nodo in $Mano.get_children():
+			if nodo.carta == carta:
+				$Mano.move_child(nodo, i)
+				break
+
+	actualizar_indices_mano()
+
+
+func confirmar_nueva_partida() -> void:
+	var dialogo := ConfirmationDialog.new()
+	dialogo.title = "Nueva partida"
+	dialogo.dialog_text = "¿Empezar una nueva partida? Se perderá el progreso de la partida actual."
+	dialogo.ok_button_text = "Aceptar"
+	dialogo.cancel_button_text = "Cancelar"
+	dialogo.confirmed.connect(_on_nueva_partida_presionado)
+	dialogo.canceled.connect(dialogo.queue_free)
+
+	add_child(dialogo)
+	dialogo.popup_centered()
 
 
 func mostrar_resultado(mensaje: String) -> void:
