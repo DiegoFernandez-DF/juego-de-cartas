@@ -28,7 +28,7 @@ const AJUSTE_CARTA_FUNDACION = Vector2(0, 0)
 
 
 var partida: Partida
-
+var zonas_columnas: Array = []
 
 func _ready():
 	partida = Partida.new()
@@ -36,6 +36,7 @@ func _ready():
 
 	configurar_distribucion()
 
+	crear_zonas_columnas()
 	mostrar_tablero()
 	mostrar_mano()
 
@@ -78,6 +79,7 @@ func configurar_fundaciones(tamano_pantalla: Vector2) -> void:
 		fundacion.indice_fundacion = numero_fundacion
 		fundacion.mouse_filter = Control.MOUSE_FILTER_STOP
 		fundacion.solicitar_movimiento.connect(mover_a_fundacion)
+		fundacion.color = Color(0, 0, 0, 0)
 
 		fundacion.size = Vector2(
 			TAMANO_CARTA.x - 15,
@@ -136,6 +138,28 @@ func configurar_mano(tamano_pantalla: Vector2) -> void:
 		posicion_x,
 		posicion_y
 	)
+
+
+func crear_zonas_columnas() -> void:
+	zonas_columnas.clear()
+
+	for numero_columna in range(partida.columnas.size()):
+		var zona_columna = preload(
+			"res://scripts/Columna_visual.gd"
+		).new()
+
+		zona_columna.indice_columna = numero_columna
+		zona_columna.mouse_filter = Control.MOUSE_FILTER_STOP
+		zona_columna.solicitar_movimiento.connect(mover_carta)
+
+		$Tablero.add_child(zona_columna)
+		zonas_columnas.append(zona_columna)
+
+		zona_columna.size = TAMANO_CARTA
+		zona_columna.position = Vector2(
+			numero_columna * SEPARACION_COLUMNAS,
+			0
+		)
 
 
 func mostrar_tablero() -> void:
@@ -216,19 +240,23 @@ func mover_carta(
 	var columna_destino = partida.columnas[indice_destino]
 
 	# Por ahora no se permiten movimientos hacia columnas vacías.
-	if columna_destino.cartas.is_empty():
-		return
-
 	var carta_inicial: Carta = cartas_movidas[0]
-	var carta_destino: Carta = columna_destino.cartas.back()
 
-	# La primera carta debe colocarse sobre un valor inmediatamente superior.
-	if carta_destino.valor != carta_inicial.valor + 1:
-		return
+	if columna_destino.cartas.is_empty():
+		# Una columna vacia solo admite un Rey o una secuencia que
+		# empiece con un Rey.
+		if carta_inicial.valor != 13:
+			return
+	else:
+		var carta_destino: Carta = columna_destino.cartas.back()
 
-	# Los colores entre la secuencia y el destino deben alternarse.
-	if es_roja(carta_inicial) == es_roja(carta_destino):
-		return
+		# La primera carta debe colocarse sobre un valor inmediatamente superior.
+		if carta_destino.valor != carta_inicial.valor + 1:
+			return
+
+		# Los colores entre la secuencia y el destino deben alternarse.
+		if es_roja(carta_inicial) == es_roja(carta_destino):
+			return
 
 	# Comprobar que toda la secuencia respete las reglas de Klondike.
 	for i in range(1, cartas_movidas.size()):
@@ -339,6 +367,7 @@ func mover_a_fundacion(
 		return
 
 	fundacion.agregar_carta(carta)
+	destino.marco_visible = false
 
 	# La carta visual pasa a la fundacion de destino.
 	var nodo: Control = nodos_movidos[0]
@@ -419,6 +448,9 @@ func actualizar_vista_tablero() -> void:
 					nodo.visible = true
 					break
 
+	# Mostrar el marco solo en las columnas que quedaron vacias.
+	for i in range(zonas_columnas.size()):
+		zonas_columnas[i].marco_visible = partida.columnas[i].cartas.is_empty()
 
 func obtener_carta_seleccionada(
 	columna: Columna,
