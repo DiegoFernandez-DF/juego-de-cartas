@@ -28,6 +28,7 @@ const AJUSTE_CARTA_FUNDACION = Vector2(0, 0)
 
 
 var partida: Partida
+var partida_terminada: bool = false
 var zonas_columnas: Array = []
 
 func _ready():
@@ -448,20 +449,74 @@ func mover_a_fundacion(
 
 
 func verificar_fin_partida() -> void:
-	if Analizador.esta_completa(partida):
-		print("Partida completada")
+	if partida_terminada:
 		return
 
-	var inicio: int = Time.get_ticks_msec()
-	var analisis: Dictionary = Analizador.analizar(partida)
-	var milisegundos: int = Time.get_ticks_msec() - inicio
+	if Analizador.esta_completa(partida):
+		mostrar_resultado("¡Has ganado!")
+		return
 
-	print(
-		"Analisis: ",
-		Analizador.Resultado.keys()[analisis["resultado"]],
-		" | estados: ", analisis["estados"],
-		" | ", milisegundos, " ms"
-	)
+	var analisis: Dictionary = Analizador.analizar(partida)
+
+	if analisis["resultado"] == Analizador.Resultado.SIN_PROGRESO:
+		mostrar_resultado("Partida bloqueada")
+
+
+func mostrar_resultado(mensaje: String) -> void:
+	partida_terminada = true
+
+	# Capa propia, por encima de todo lo demas.
+	var capa := CanvasLayer.new()
+	capa.layer = 10
+	add_child(capa)
+
+	# Fondo oscuro que tambien bloquea el mouse sobre el tablero.
+	var oscurecer := ColorRect.new()
+	oscurecer.color = Color(0, 0, 0, 0.55)
+	oscurecer.mouse_filter = Control.MOUSE_FILTER_STOP
+	capa.add_child(oscurecer)
+	oscurecer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var centro := CenterContainer.new()
+	capa.add_child(centro)
+	centro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var panel := PanelContainer.new()
+	centro.add_child(panel)
+
+	var margen := MarginContainer.new()
+	margen.add_theme_constant_override("margin_left", 50)
+	margen.add_theme_constant_override("margin_right", 50)
+	margen.add_theme_constant_override("margin_top", 40)
+	margen.add_theme_constant_override("margin_bottom", 40)
+	panel.add_child(margen)
+
+	var contenido := VBoxContainer.new()
+	contenido.add_theme_constant_override("separation", 20)
+	margen.add_child(contenido)
+
+	var titulo := Label.new()
+	titulo.text = mensaje
+	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	titulo.add_theme_font_size_override("font_size", 36)
+	contenido.add_child(titulo)
+
+	var boton_nueva := Button.new()
+	boton_nueva.text = "Crear nueva partida"
+	boton_nueva.custom_minimum_size = Vector2(280, 50)
+	boton_nueva.pressed.connect(_on_nueva_partida_presionado)
+	contenido.add_child(boton_nueva)
+
+	var boton_salir := Button.new()
+	boton_salir.text = "Salir del juego"
+	boton_salir.custom_minimum_size = Vector2(280, 50)
+	boton_salir.pressed.connect(get_tree().quit)
+	contenido.add_child(boton_salir)
+
+
+func _on_nueva_partida_presionado() -> void:
+	# Recarga la escena: se crea y reparte una partida nueva.
+	get_tree().reload_current_scene()
 
 
 func es_roja(carta: Carta) -> bool:
