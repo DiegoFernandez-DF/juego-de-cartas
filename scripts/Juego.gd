@@ -364,6 +364,7 @@ func mover_carta(
 
 	actualizar_vista_tablero()
 	actualizar_indices_mano()
+	verificar_fin_partida()
 
 
 func mover_a_fundacion(
@@ -443,6 +444,24 @@ func mover_a_fundacion(
 
 	actualizar_vista_tablero()
 	actualizar_indices_mano()
+	verificar_fin_partida()
+
+
+func verificar_fin_partida() -> void:
+	if Analizador.esta_completa(partida):
+		print("Partida completada")
+		return
+
+	var inicio: int = Time.get_ticks_msec()
+	var analisis: Dictionary = Analizador.analizar(partida)
+	var milisegundos: int = Time.get_ticks_msec() - inicio
+
+	print(
+		"Analisis: ",
+		Analizador.Resultado.keys()[analisis["resultado"]],
+		" | estados: ", analisis["estados"],
+		" | ", milisegundos, " ms"
+	)
 
 
 func es_roja(carta: Carta) -> bool:
