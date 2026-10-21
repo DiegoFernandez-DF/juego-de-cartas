@@ -40,7 +40,8 @@ func _can_drop_data(
 		return false
 
 	if datos["zona_origen"] != "mano" \
-	and datos["zona_origen"] != "tablero":
+	and datos["zona_origen"] != "tablero" \
+	and datos["zona_origen"] != "fundacion":
 		return false
 
 	if datos["zona_origen"] == "tablero":
