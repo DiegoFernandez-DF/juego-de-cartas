@@ -80,6 +80,7 @@ func configurar_fundaciones(tamano_pantalla: Vector2) -> void:
 		fundacion.mouse_filter = Control.MOUSE_FILTER_STOP
 		fundacion.solicitar_movimiento.connect(mover_a_fundacion)
 		fundacion.color = Color(0, 0, 0, 0)
+		fundacion.modelo = partida.fundaciones[numero_fundacion]
 
 		fundacion.size = Vector2(
 			TAMANO_CARTA.x - 15,
@@ -307,6 +308,43 @@ func mover_carta(
 		nodo_origen.get_parent().remove_child(nodo_origen)
 		$Tablero.add_child(nodo_origen)
 
+	elif zona_origen == "fundacion":
+		if cartas_movidas.size() != 1:
+			return
+
+		var indice_fundacion: int = datos_arrastre["indice_fundacion"]
+		var fundacion_origen: Fundacion = partida.fundaciones[indice_fundacion]
+
+		# Solo puede salir la carta superior de la fundacion.
+		if fundacion_origen.cartas.is_empty():
+			return
+
+		if fundacion_origen.cartas.back() != cartas_movidas[0]:
+			return
+
+		fundacion_origen.cartas.pop_back()
+
+		# Si la fundacion quedo vacia, vuelve a mostrar su marco.
+		datos_arrastre["nodo_origen"].marco_visible = fundacion_origen.cartas.is_empty()
+
+		# Se descarta la carta visual de la fundacion y se crea una
+		# nueva en el tablero, con la configuracion normal de una carta
+		# de columna.
+		var nodo_fundacion: Control = nodos_movidos[0]
+		nodo_fundacion.get_parent().remove_child(nodo_fundacion)
+		nodo_fundacion.queue_free()
+
+		var carta_visual = preload(
+			"res://scenes/CartaVisual.tscn"
+		).instantiate()
+
+		carta_visual.configurar(cartas_movidas[0])
+		carta_visual.zona = "tablero"
+		carta_visual.solicitar_movimiento.connect(mover_carta)
+
+		$Tablero.add_child(carta_visual)
+		carta_visual.size = TAMANO_CARTA
+
 	else:
 		return
 
@@ -326,6 +364,7 @@ func mover_carta(
 
 	actualizar_vista_tablero()
 	actualizar_indices_mano()
+	verificar_fin_partida()
 
 
 func mover_a_fundacion(
@@ -405,6 +444,24 @@ func mover_a_fundacion(
 
 	actualizar_vista_tablero()
 	actualizar_indices_mano()
+	verificar_fin_partida()
+
+
+func verificar_fin_partida() -> void:
+	if Analizador.esta_completa(partida):
+		print("Partida completada")
+		return
+
+	var inicio: int = Time.get_ticks_msec()
+	var analisis: Dictionary = Analizador.analizar(partida)
+	var milisegundos: int = Time.get_ticks_msec() - inicio
+
+	print(
+		"Analisis: ",
+		Analizador.Resultado.keys()[analisis["resultado"]],
+		" | estados: ", analisis["estados"],
+		" | ", milisegundos, " ms"
+	)
 
 
 func es_roja(carta: Carta) -> bool:
