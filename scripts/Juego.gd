@@ -26,21 +26,44 @@ const DESPLAZAMIENTO_X_MANO = 0
 # Positivo = hacia la derecha / abajo. Negativo = izquierda / arriba.
 const AJUSTE_CARTA_FUNDACION = Vector2(0, 0)
 
+# Orden de dibujo base de la mano (siempre por encima del tablero).
+const Z_MANO = 100
+
+# Margen entre la ultima carta de una columna y la mano.
+const MARGEN_TABLERO_MANO = 10
+
+# Separacion vertical que se intenta conservar al comprimir una columna.
+const SEPARACION_COMODA_OCULTAS = 20
+const SEPARACION_COMODA_VISIBLES = 28
+
+# Separacion minima absoluta, solo si no alcanza el espacio.
+const SEPARACION_MINIMA_OCULTAS = 12
+const SEPARACION_MINIMA_VISIBLES = 22
+
 
 var partida: Partida
 var partida_terminada: bool = false
 var zonas_columnas: Array = []
 
 func _ready():
-	partida = Partida.new()
-	partida.iniciar_partida()
+	# Si el menu cargo una partida guardada, se usa esa.
+	partida = Sesion.partida_cargada
+	Sesion.partida_cargada = null
+
+	if partida == null:
+		partida = Partida.new()
+		partida.iniciar_partida()
 
 	configurar_distribucion()
 
 	crear_zonas_columnas()
 	mostrar_tablero()
 	mostrar_mano()
+	mostrar_fundaciones()
+	actualizar_vista_tablero()
 	crear_botones_interfaz()
+
+	verificar_fin_partida()
 
 
 func configurar_distribucion() -> void:
@@ -118,7 +141,7 @@ func configurar_tablero(tamano_pantalla: Vector2) -> void:
 
 
 func configurar_mano(tamano_pantalla: Vector2) -> void:
-	var cantidad_cartas = partida.mano.cartas.size()
+	var cantidad_cartas = 24
 
 	var ancho_mano = (
 		TAMANO_CARTA.x
@@ -141,6 +164,7 @@ func configurar_mano(tamano_pantalla: Vector2) -> void:
 		posicion_x,
 		posicion_y
 	)
+	
 
 
 func crear_zonas_columnas() -> void:
@@ -222,7 +246,46 @@ func mostrar_mano() -> void:
 			0
 		)
 
-		carta_visual.z_index = numero_carta
+		carta_visual.z_index = Z_MANO + numero_carta
+
+
+func mostrar_fundaciones() -> void:
+	for numero_fundacion in range(partida.fundaciones.size()):
+		var fundacion: Fundacion = partida.fundaciones[numero_fundacion]
+
+		if fundacion.cartas.is_empty():
+			continue
+
+		var destino = $Fundaciones.get_node(
+			"Fundacion%d" % (numero_fundacion + 1)
+		)
+		destino.marco_visible = false
+
+		for numero_carta in range(fundacion.cartas.size()):
+			var carta_visual = preload(
+				"res://scenes/CartaVisual.tscn"
+			).instantiate()
+
+			carta_visual.configurar(fundacion.cartas[numero_carta])
+
+			carta_visual.zona = "fundacion"
+			carta_visual.indice_columna = -1
+			carta_visual.indice_carta = numero_carta
+
+			destino.add_child(carta_visual)
+
+			carta_visual.size = TAMANO_CARTA
+			carta_visual.position = (
+				(destino.size - TAMANO_CARTA) / 2.0
+				+ AJUSTE_CARTA_FUNDACION
+			)
+
+			# Igual que al colocar una carta: no capturan el mouse.
+			carta_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+			for hijo in carta_visual.get_children():
+				if hijo is Control:
+					hijo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 func mover_carta(
@@ -476,6 +539,10 @@ func crear_botones_interfaz() -> void:
 	_anclar_abajo(panel_izquierdo, false)
 
 	panel_izquierdo.add_child(
+		_crear_boton("Guardar partida", guardar_partida)
+	)
+
+	panel_izquierdo.add_child(
 		_crear_boton("Nueva partida", confirmar_nueva_partida)
 	)
 
@@ -573,10 +640,33 @@ func reordenar_mano_visual() -> void:
 func confirmar_nueva_partida() -> void:
 	var dialogo := ConfirmationDialog.new()
 	dialogo.title = "Nueva partida"
-	dialogo.dialog_text = "¿Empezar una nueva partida? Se perderá el progreso de la partida actual."
+	dialogo.dialog_text = "¿Empezar una nueva partida? Se perderá el progreso de la partida actual y la partida guardada."
 	dialogo.ok_button_text = "Aceptar"
 	dialogo.cancel_button_text = "Cancelar"
 	dialogo.confirmed.connect(_on_nueva_partida_presionado)
+	dialogo.canceled.connect(dialogo.queue_free)
+
+	add_child(dialogo)
+	dialogo.popup_centered()
+
+
+func guardar_partida() -> void:
+	# Solo se pueden guardar partidas en curso.
+	if partida_terminada:
+		return
+
+	if Guardado.guardar(partida):
+		mostrar_aviso("Partida guardada.")
+	else:
+		mostrar_aviso("No fue posible guardar la partida.")
+
+
+func mostrar_aviso(texto: String) -> void:
+	var dialogo := AcceptDialog.new()
+	dialogo.title = "Guardar partida"
+	dialogo.dialog_text = texto
+	dialogo.ok_button_text = "Aceptar"
+	dialogo.confirmed.connect(dialogo.queue_free)
 	dialogo.canceled.connect(dialogo.queue_free)
 
 	add_child(dialogo)
@@ -636,7 +726,8 @@ func mostrar_resultado(mensaje: String) -> void:
 
 
 func _on_nueva_partida_presionado() -> void:
-	# Recarga la escena: se crea y reparte una partida nueva.
+	# Segun la especificacion, una partida nueva elimina el guardado.
+	Guardado.borrar()
 	get_tree().reload_current_scene()
 
 
@@ -656,12 +747,98 @@ func actualizar_indices_mano() -> void:
 			i * SEPARACION_MANO,
 			0
 		)
-		carta_visual.z_index = i
+		carta_visual.z_index = Z_MANO + i
+
+
+# Posicion vertical de cada carta de una columna. Si la columna es larga,
+# se comprime lo menos posible para no llegar a la mano.
+func calcular_posiciones_y(columna: Columna) -> Array[float]:
+	var ocultas: int = 0
+
+	for carta in columna.cartas:
+		if not carta.visible:
+			ocultas += 1
+
+	var visibles: int = columna.cartas.size() - ocultas
+
+	# Espacio disponible para las separaciones (sin contar la ultima carta).
+	var espacio: float = (
+		$Mano.position.y - MARGEN_TABLERO_MANO
+		- $Tablero.position.y
+		- TAMANO_CARTA.y
+	)
+
+	var pasos := Vector2(
+		SEPARACION_VERTICAL_TABLERO,
+		SEPARACION_VERTICAL_TABLERO
+	)
+
+	# Primero se comprime hasta lo "comodo"; si no alcanza, hasta el minimo.
+	pasos = _comprimir_pasos(
+		ocultas, visibles, espacio, pasos,
+		SEPARACION_COMODA_OCULTAS, SEPARACION_COMODA_VISIBLES
+	)
+	pasos = _comprimir_pasos(
+		ocultas, visibles, espacio, pasos,
+		SEPARACION_MINIMA_OCULTAS, SEPARACION_MINIMA_VISIBLES
+	)
+
+	var posiciones: Array[float] = []
+	var y: float = 0.0
+
+	for carta in columna.cartas:
+		posiciones.append(y)
+		y += pasos.y if carta.visible else pasos.x
+
+	return posiciones
+
+
+func _extension(
+	ocultas: int,
+	visibles: int,
+	pasos: Vector2
+) -> float:
+	return ocultas * pasos.x + maxi(visibles - 1, 0) * pasos.y
+
+
+# pasos.x = separacion de las ocultas, pasos.y = la de las visibles.
+# Comprime primero las ocultas y despues las visibles, sin bajar de los
+# minimos dados y sin aumentar nunca lo que ya estaba mas chico.
+func _comprimir_pasos(
+	ocultas: int,
+	visibles: int,
+	espacio: float,
+	pasos: Vector2,
+	minimo_ocultas: float,
+	minimo_visibles: float
+) -> Vector2:
+	if _extension(ocultas, visibles, pasos) <= espacio:
+		return pasos
+
+	if ocultas > 0:
+		pasos.x = clampf(
+			(espacio - maxi(visibles - 1, 0) * pasos.y) / ocultas,
+			minimo_ocultas,
+			pasos.x
+		)
+
+	if _extension(ocultas, visibles, pasos) <= espacio:
+		return pasos
+
+	if visibles > 1:
+		pasos.y = clampf(
+			(espacio - ocultas * pasos.x) / (visibles - 1),
+			minimo_visibles,
+			pasos.y
+		)
+
+	return pasos
 
 
 func actualizar_vista_tablero() -> void:
 	for numero_columna in range(partida.columnas.size()):
 		var columna = partida.columnas[numero_columna]
+		var posiciones_y: Array[float] = calcular_posiciones_y(columna)
 
 		for numero_carta in range(columna.cartas.size()):
 			var carta = columna.cartas[numero_carta]
@@ -674,7 +851,7 @@ func actualizar_vista_tablero() -> void:
 
 					nodo.position = Vector2(
 						numero_columna * SEPARACION_COLUMNAS,
-						numero_carta * SEPARACION_VERTICAL_TABLERO
+						posiciones_y[numero_carta]
 					)
 
 					nodo.z_index = numero_carta
@@ -685,13 +862,16 @@ func actualizar_vista_tablero() -> void:
 	for i in range(zonas_columnas.size()):
 		zonas_columnas[i].marco_visible = partida.columnas[i].cartas.is_empty()
 
+
 func obtener_carta_seleccionada(
 	columna: Columna,
 	posicion_y: float
 ) -> int:
+	var posiciones_y: Array[float] = calcular_posiciones_y(columna)
+
 	for i in range(columna.cartas.size() - 1, -1, -1):
-		var inicio_y := i * SEPARACION_VERTICAL_TABLERO
-		var fin_y := inicio_y + TAMANO_CARTA.y
+		var inicio_y: float = posiciones_y[i]
+		var fin_y: float = inicio_y + TAMANO_CARTA.y
 
 		if posicion_y >= inicio_y and posicion_y < fin_y:
 			return i

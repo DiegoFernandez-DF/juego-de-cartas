@@ -17,6 +17,40 @@ func configurar(p_carta: Carta) -> void:
 	actualizar_visual()
 
 
+func _ready() -> void:
+	# Solo la carta en si recibe el mouse, no sus imagenes internas.
+	for hijo in get_children():
+		if hijo is Control:
+			hijo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+# El area que responde al mouse es la de la imagen dibujada, sin los
+# margenes transparentes de los costados.
+func _has_point(punto: Vector2) -> bool:
+	var margen: float = obtener_margen_horizontal()
+
+	return Rect2(
+		margen,
+		0.0,
+		size.x - 2.0 * margen,
+		size.y
+	).has_point(punto)
+
+
+func obtener_margen_horizontal() -> float:
+	var textura: Texture2D = $Ilustracion.texture
+
+	if textura == null or textura.get_height() == 0:
+		return 0.0
+
+	var ancho_dibujado: float = minf(
+		size.x,
+		size.y * textura.get_width() / float(textura.get_height())
+	)
+
+	return (size.x - ancho_dibujado) / 2.0
+
+
 func actualizar_visual() -> void:
 	actualizar_ilustracion()
 	actualizar_dorso()
@@ -136,15 +170,24 @@ func _get_drag_data(_posicion: Vector2) -> Variant:
 	var contenedor = Control.new()
 	contenedor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var altura_previa = size.y + (cartas_movidas.size() - 1) * 35
+	# Separacion real entre las cartas arrastradas (puede ser menor a 35
+	# si la columna esta comprimida).
+	var base_y: float = nodos_arrastrados[0].position.y
+	var altura_previa: float = (
+		size.y + nodos_arrastrados.back().position.y - base_y
+	)
 	contenedor.size = Vector2(size.x, altura_previa)
+
+	# La copia que sigue al mouse se dibuja por encima de todo.
+	contenedor.z_index = 1000
 
 	for i in range(nodos_arrastrados.size()):
 		var vista_previa = nodos_arrastrados[i].duplicate() as Control
 		vista_previa.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		vista_previa.z_index = 0
 		vista_previa.position = Vector2(
 			-_posicion.x,
-			i * 35 - _posicion.y
+			nodos_arrastrados[i].position.y - base_y - _posicion.y
 		)
 		vista_previa.size = size
 		vista_previa.custom_minimum_size = size
