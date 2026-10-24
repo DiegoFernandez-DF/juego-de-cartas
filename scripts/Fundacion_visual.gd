@@ -71,6 +71,8 @@ func _get_drag_data(posicion: Vector2) -> Variant:
 	var contenedor := Control.new()
 	contenedor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	contenedor.size = nodo_superior.size
+	contenedor.z_index = 1000
+	vista_previa.z_index = 0
 	contenedor.add_child(vista_previa)
 	set_drag_preview(contenedor)
 
