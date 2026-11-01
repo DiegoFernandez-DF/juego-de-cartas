@@ -40,10 +40,18 @@ const SEPARACION_COMODA_VISIBLES = 28
 const SEPARACION_MINIMA_OCULTAS = 12
 const SEPARACION_MINIMA_VISIBLES = 22
 
+# Cantidad de cartas de una mano completa.
+const CARTAS_EN_MANO = 24
+
+# Animacion de las cartas de la mano (en segundos).
+const DURACION_ANIMACION_MANO = 0.18
+const RETRASO_ENTRE_CARTAS = 0.008
+
 
 var partida: Partida
 var partida_terminada: bool = false
 var zonas_columnas: Array = []
+var tween_mano: Tween = null
 
 func _ready():
 	# Si el menu cargo una partida guardada, se usa esa.
@@ -59,6 +67,7 @@ func _ready():
 	crear_zonas_columnas()
 	mostrar_tablero()
 	mostrar_mano()
+	actualizar_indices_mano()
 	mostrar_fundaciones()
 	actualizar_vista_tablero()
 	crear_botones_interfaz()
@@ -141,7 +150,7 @@ func configurar_tablero(tamano_pantalla: Vector2) -> void:
 
 
 func configurar_mano(tamano_pantalla: Vector2) -> void:
-	var cantidad_cartas = 24
+	var cantidad_cartas = CARTAS_EN_MANO
 
 	var ancho_mano = (
 		TAMANO_CARTA.x
@@ -543,7 +552,11 @@ func crear_botones_interfaz() -> void:
 	)
 
 	panel_izquierdo.add_child(
-		_crear_boton("Nueva partida", confirmar_nueva_partida)
+		_crear_boton("Crear nueva partida", confirmar_nueva_partida)
+	)
+
+	panel_izquierdo.add_child(
+		_crear_boton("Salir del juego", confirmar_salir)
 	)
 
 	# Abajo a la derecha: ordenamiento de la mano.
@@ -634,7 +647,7 @@ func reordenar_mano_visual() -> void:
 				$Mano.move_child(nodo, i)
 				break
 
-	actualizar_indices_mano()
+	actualizar_indices_mano(true)
 
 
 func confirmar_nueva_partida() -> void:
@@ -659,6 +672,19 @@ func guardar_partida() -> void:
 		mostrar_aviso("Partida guardada.")
 	else:
 		mostrar_aviso("No fue posible guardar la partida.")
+
+
+func confirmar_salir() -> void:
+	var dialogo := ConfirmationDialog.new()
+	dialogo.title = "Salir del juego"
+	dialogo.dialog_text = "¿Salir del juego? Se perderá el progreso que no hayas guardado."
+	dialogo.ok_button_text = "Salir"
+	dialogo.cancel_button_text = "Cancelar"
+	dialogo.confirmed.connect(get_tree().quit)
+	dialogo.canceled.connect(dialogo.queue_free)
+
+	add_child(dialogo)
+	dialogo.popup_centered()
 
 
 func mostrar_aviso(texto: String) -> void:
@@ -738,16 +764,42 @@ func es_roja(carta: Carta) -> bool:
 	)
 
 
-func actualizar_indices_mano() -> void:
-	for i in range($Mano.get_child_count()):
+# Acomoda las cartas de la mano, centradas dentro del espacio de la mano.
+# Con animar = true, las cartas se deslizan hasta su nueva posicion.
+func actualizar_indices_mano(animar: bool = false) -> void:
+	# Si todavia hay una animacion en curso, se descarta.
+	if tween_mano != null and tween_mano.is_valid():
+		tween_mano.kill()
+
+	var cantidad: int = $Mano.get_child_count()
+
+	# El conjunto se centra respecto del ancho de una mano completa.
+	var ancho_completo: float = (
+		TAMANO_CARTA.x + (CARTAS_EN_MANO - 1) * SEPARACION_MANO
+	)
+	var ancho_actual: float = (
+		TAMANO_CARTA.x + maxi(cantidad - 1, 0) * SEPARACION_MANO
+	)
+	var desplazamiento: float = (ancho_completo - ancho_actual) / 2.0
+
+	if animar and cantidad > 0:
+		tween_mano = create_tween().set_parallel(true)
+
+	for i in range(cantidad):
 		var carta_visual = $Mano.get_child(i)
+		var destino := Vector2(desplazamiento + i * SEPARACION_MANO, 0)
 
 		carta_visual.indice_carta = i
-		carta_visual.position = Vector2(
-			i * SEPARACION_MANO,
-			0
-		)
 		carta_visual.z_index = Z_MANO + i
+
+		if animar:
+			tween_mano.tween_property(
+				carta_visual, "position", destino, DURACION_ANIMACION_MANO
+			).set_delay(i * RETRASO_ENTRE_CARTAS).set_trans(
+				Tween.TRANS_QUAD
+			).set_ease(Tween.EASE_OUT)
+		else:
+			carta_visual.position = destino
 
 
 # Posicion vertical de cada carta de una columna. Si la columna es larga,
