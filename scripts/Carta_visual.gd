@@ -5,6 +5,20 @@ extends Control
 signal solicitar_movimiento(datos_arrastre: Dictionary, destino: Control)
 
 
+# Borde y sombra de las cartas (se dibujan por codigo, sirven para cualquier mazo).
+const CONTORNO_ANCHO = 0
+const CONTORNO_COLOR = Color(0, 0, 0, 0)
+const SOMBRA_COLOR = Color(0, 0, 0, 0)
+const SOMBRA_TAMANO = 3
+const SOMBRA_DESPLAZAMIENTO = Vector2(1, 2)
+
+# Radio de esquina que se usa si no se puede medir en la imagen.
+const RADIO_ESQUINA_DEFECTO = 7.0
+
+# Medidas ya calculadas de cada imagen (se calculan una sola vez).
+static var _medidas: Dictionary = {}
+
+
 var carta: Carta
 var zona: String
 var indice_columna: int = -1
@@ -22,6 +36,9 @@ func _ready() -> void:
 	for hijo in get_children():
 		if hijo is Control:
 			hijo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# El borde se redibuja cuando la carta cambia de tamano.
+	if not resized.is_connected(queue_redraw):
+		resized.connect(queue_redraw)
 
 
 # El area que responde al mouse es la de la imagen dibujada, sin los
@@ -54,6 +71,7 @@ func obtener_margen_horizontal() -> float:
 func actualizar_visual() -> void:
 	actualizar_ilustracion()
 	actualizar_dorso()
+	queue_redraw()
 
 
 func actualizar_ilustracion() -> void:
@@ -69,6 +87,105 @@ func actualizar_ilustracion() -> void:
 
 func actualizar_dorso() -> void:
 	$Dorso.visible = not carta.visible
+
+
+func _draw() -> void:
+	var textura: Texture2D = obtener_textura_visible()
+
+	if CONTORNO_ANCHO == 0 and SOMBRA_COLOR.a == 0.0:
+		return
+
+	if textura == null:
+		return
+
+	var arte: Rect2 = obtener_rect_arte(textura)
+	var radio: float = obtener_radio_esquina(textura, arte)
+
+	var estilo := StyleBoxFlat.new()
+	estilo.draw_center = false
+	estilo.set_border_width_all(CONTORNO_ANCHO)
+	estilo.border_color = CONTORNO_COLOR
+	estilo.set_corner_radius_all(int(round(radio)) + CONTORNO_ANCHO)
+	estilo.shadow_color = SOMBRA_COLOR
+	estilo.shadow_size = SOMBRA_TAMANO
+	estilo.shadow_offset = SOMBRA_DESPLAZAMIENTO
+
+	# El contorno queda justo por fuera de la imagen, asi no la tapa.
+	draw_style_box(estilo, arte.grow(CONTORNO_ANCHO))
+
+
+# Imagen que se esta mostrando ahora: el dorso o la cara.
+func obtener_textura_visible() -> Texture2D:
+	if $Dorso.visible:
+		return $Dorso.texture
+
+	return $Ilustracion.texture
+
+
+# Rectangulo que ocupa realmente la carta dibujada dentro del control.
+func obtener_rect_arte(textura: Texture2D) -> Rect2:
+	if textura.get_width() == 0 or textura.get_height() == 0:
+		return Rect2(Vector2.ZERO, size)
+
+	var escala: float = minf(
+		size.x / textura.get_width(),
+		size.y / textura.get_height()
+	)
+	var mostrado := Vector2(
+		textura.get_width(), textura.get_height()
+	) * escala
+	var origen: Vector2 = (size - mostrado) / 2.0
+	var usado: Rect2 = _medir_textura(textura)["usado"]
+
+	return Rect2(origen + usado.position * escala, usado.size * escala)
+
+
+func obtener_radio_esquina(textura: Texture2D, arte: Rect2) -> float:
+	var medida: Dictionary = _medir_textura(textura)
+	var radio_nativo: float = medida["radio"]
+
+	if radio_nativo < 0.0:
+		return RADIO_ESQUINA_DEFECTO
+
+	var usado: Rect2 = medida["usado"]
+	return radio_nativo * arte.size.y / usado.size.y
+
+
+# Mide en la imagen la zona no transparente y el radio de sus esquinas.
+static func _medir_textura(textura: Texture2D) -> Dictionary:
+	if _medidas.has(textura):
+		return _medidas[textura]
+
+	var usado := Rect2(0, 0, textura.get_width(), textura.get_height())
+	var radio: float = -1.0
+	var imagen: Image = textura.get_image()
+
+	if imagen != null and not imagen.is_empty():
+		if imagen.is_compressed():
+			imagen.decompress()
+
+		var u: Rect2i = imagen.get_used_rect()
+
+		if u.size.x > 0 and u.size.y > 0:
+			usado = Rect2(u)
+
+			var lado: int = mini(40, int(mini(u.size.x, u.size.y) * 0.5))
+			var transparentes: int = 0
+
+			for y in range(lado):
+				for x in range(lado):
+					var pixel: Color = imagen.get_pixel(
+						u.position.x + x, u.position.y + y
+					)
+					if pixel.a < 0.5:
+						transparentes += 1
+
+			# El area transparente de una esquina redondeada es r^2 * (1 - PI/4).
+			radio = sqrt(transparentes / (1.0 - PI / 4.0))
+
+	var medida := {"usado": usado, "radio": radio}
+	_medidas[textura] = medida
+	return medida
 
 
 func obtener_ruta_ilustracion() -> String:

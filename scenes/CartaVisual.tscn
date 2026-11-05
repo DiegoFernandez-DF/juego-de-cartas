@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://l733rsq8lcun"]
 
 [ext_resource type="Script" uid="uid://b1eeccteao485" path="res://scripts/Carta_visual.gd" id="1_kywfn"]
-[ext_resource type="Texture2D" uid="uid://jlubr6jwg54p" path="res://assets/cartas/dorso/Dorso.png" id="2_p6afr"]
+[ext_resource type="Texture2D" uid="uid://bcnvleuxjygki" path="res://assets/cartas/dorso/dorso_burdeos.png" id="2_p6afr"]
 
 [node name="CartaVisual" type="Control" unique_id=1133021980]
 layout_mode = 3
