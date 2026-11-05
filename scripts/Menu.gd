@@ -2,7 +2,6 @@ extends Control
 
 
 const ESCENA_JUEGO = "res://scenes/Juego.tscn"
-const RUTA_DORSO = "res://assets/cartas/dorso/Dorso.png"
 
 # Medidas del tablero del juego (para que el fondo coincida con la partida).
 const ANCHO_CARTA = 128.0
@@ -30,23 +29,8 @@ func _crear_tablero_vacio() -> void:
 	var pantalla: Vector2 = get_viewport_rect().size
 	var x_tablero: float = roundf((pantalla.x - ANCHO_TABLERO) / 2.0)
 
-	# Mazo: unas pocas cartas apiladas, arriba a la izquierda.
-	var dorso := load(RUTA_DORSO) as Texture2D
-
-	if dorso != null:
-		for i in range(3):
-			var desplazamiento: float = (2 - i) * 2.0
-			var carta := TextureRect.new()
-			carta.texture = dorso
-			carta.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			carta.stretch_mode = TextureRect.STRETCH_SCALE
-			carta.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			add_child(carta)
-			carta.size = Vector2(ANCHO_CARTA, ALTO_CARTA)
-			carta.position = Vector2(
-				x_tablero + MARGEN_CARTA + desplazamiento,
-				Y_SUPERIOR + desplazamiento
-			)
+	# Mazo: una pila de cartas arriba a la izquierda.
+	MazoVisual.crear(self, Vector2(x_tablero, Y_SUPERIOR))
 
 	# Cuatro fundaciones vacias.
 	for i in range(4):
@@ -96,7 +80,7 @@ func _crear_opciones() -> void:
 	centro.add_child(opciones)
 
 	var titulo := Estilo.crear_etiqueta(
-		"Videojuego de cartas", 60, Estilo.ORO_CLARO
+		"Solitario Klondike", 60, Estilo.ORO_CLARO
 	)
 	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	titulo.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))

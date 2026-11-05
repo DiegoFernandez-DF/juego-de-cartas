@@ -59,6 +59,12 @@ const COLOR_NEGRO_FICHA = Color(0.10, 0.10, 0.10)
 # Ancho del texto de los carteles (el cartel no se puede estirar).
 const ANCHO_CARTEL = 440
 
+# Reparto inicial animado (en segundos).
+const REPARTO_DURACION = 0.16
+const REPARTO_RETRASO = 0.016
+const REPARTO_PAUSA_INICIAL = 0.4
+const MAZO_Y = 10.0
+
 
 var partida: Partida
 var partida_terminada: bool = false
@@ -67,15 +73,16 @@ var tween_mano: Tween = null
 
 
 func _ready():
-		# Fondo nuevo, por detras de todo el juego.
+	# Fondo nuevo, por detras de todo el juego.
 	$Fondo.visible = false
 	add_child(FondoTablero.crear())
-	
+
 	# Si el menu cargo una partida guardada, se usa esa.
 	partida = Sesion.partida_cargada
 	Sesion.partida_cargada = null
+	var es_nueva: bool = (partida == null)
 
-	if partida == null:
+	if es_nueva:
 		partida = Partida.new()
 		partida.iniciar_partida()
 
@@ -88,6 +95,10 @@ func _ready():
 	mostrar_fundaciones()
 	actualizar_vista_tablero()
 	crear_botones_interfaz()
+
+	# Reparto animado solo en partidas nuevas, no al cargar una guardada.
+	if es_nueva:
+		await repartir_animado()
 
 	verificar_fin_partida()
 
@@ -617,6 +628,98 @@ func mover_a_fundacion(
 	actualizar_vista_tablero()
 	actualizar_indices_mano()
 	verificar_fin_partida()
+
+
+# Las cartas salen del mazo hacia el tablero y la mano, fila por fila.
+func repartir_animado() -> void:
+	# Tapa transparente: bloquea el mouse mientras se reparte.
+	var bloqueo := CanvasLayer.new()
+	bloqueo.layer = 15
+	add_child(bloqueo)
+
+	var tapa := ColorRect.new()
+	tapa.color = Color(0, 0, 0, 0)
+	tapa.mouse_filter = Control.MOUSE_FILTER_STOP
+	bloqueo.add_child(tapa)
+	tapa.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var mazo: MazoVisual = _crear_mazo_visual()
+
+	# Carta visual de cada carta del modelo.
+	var nodos: Dictionary = {}
+
+	for nodo in $Tablero.get_children():
+		if nodo is Control and nodo.carta != null:
+			nodos[nodo.carta] = nodo
+
+	for nodo in $Mano.get_children():
+		nodos[nodo.carta] = nodo
+
+	# Orden de reparto: fila por fila entre las columnas, y despues la mano.
+	var orden: Array = []
+
+	for fila in range(7):
+		for columna in range(fila, 7):
+			if fila < partida.columnas[columna].cartas.size():
+				orden.append(partida.columnas[columna].cartas[fila])
+
+	for carta in partida.mano.cartas:
+		orden.append(carta)
+
+	var inicio := Vector2($Tablero.global_position.x, MAZO_Y)
+	var tween := create_tween().set_parallel(true)
+	var total: int = orden.size()
+	var capas_visibles: int = MazoVisual.CAPAS
+
+	for i in range(total):
+		var nodo: Control = nodos[orden[i]]
+		var destino: Vector2 = nodo.global_position
+		var z_final: int = nodo.z_index
+		var t: float = REPARTO_PAUSA_INICIAL + i * REPARTO_RETRASO
+
+		# La carta espera oculta en el mazo y despues vuela a su lugar.
+		nodo.global_position = inicio
+		nodo.visible = false
+		nodo.z_index = 500 + i
+
+		tween.tween_callback(nodo.set_visible.bind(true)).set_delay(t)
+		tween.tween_property(
+			nodo, "global_position", destino, REPARTO_DURACION
+		).set_delay(t).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_callback(
+			nodo.set.bind("z_index", z_final)
+		).set_delay(t + REPARTO_DURACION)
+
+		# El mazo se achica a medida que salen cartas.
+		var restantes: int = ceili(
+			float(MazoVisual.CAPAS) * (total - i - 1) / total
+		)
+
+		if restantes != capas_visibles:
+			capas_visibles = restantes
+			tween.tween_callback(
+				mazo.mostrar_capas.bind(restantes)
+			).set_delay(t)
+
+	await tween.finished
+
+	mazo.queue_free()
+	bloqueo.queue_free()
+
+	# Por las dudas, todo queda exactamente en su posicion final.
+	actualizar_vista_tablero()
+	actualizar_indices_mano()
+
+
+# El mazo va detras de las cartas del juego, asi las cartas repartidas
+# siempre pasan por encima de el.
+func _crear_mazo_visual() -> MazoVisual:
+	var mazo := MazoVisual.crear(
+		self,
+		Vector2($Tablero.global_position.x, MAZO_Y)
+	)
+	mazo.z_index = -1
+	return mazo
 
 
 func verificar_fin_partida() -> void:
