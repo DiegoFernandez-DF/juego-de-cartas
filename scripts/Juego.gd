@@ -47,13 +47,30 @@ const CARTAS_EN_MANO = 24
 const DURACION_ANIMACION_MANO = 0.18
 const RETRASO_ENTRE_CARTAS = 0.008
 
+# Estilo de los botones de la partida.
+const TAMANO_FICHA = 52
+const COLOR_ORO = Color(0.79, 0.64, 0.15)
+const COLOR_ORO_CLARO = Color(0.95, 0.83, 0.42)
+const COLOR_CREMA = Color(0.96, 0.94, 0.89)
+const COLOR_TEXTO = Color(0.95, 0.92, 0.82)
+const COLOR_ROJO_FICHA = Color(0.78, 0.15, 0.12)
+const COLOR_NEGRO_FICHA = Color(0.10, 0.10, 0.10)
+
+# Ancho del texto de los carteles (el cartel no se puede estirar).
+const ANCHO_CARTEL = 440
+
 
 var partida: Partida
 var partida_terminada: bool = false
 var zonas_columnas: Array = []
 var tween_mano: Tween = null
 
+
 func _ready():
+		# Fondo nuevo, por detras de todo el juego.
+	$Fondo.visible = false
+	add_child(FondoTablero.crear())
+	
 	# Si el menu cargo una partida guardada, se usa esa.
 	partida = Sesion.partida_cargada
 	Sesion.partida_cargada = null
@@ -81,6 +98,9 @@ func configurar_distribucion() -> void:
 	configurar_fundaciones(tamano_pantalla)
 	configurar_tablero(tamano_pantalla)
 	configurar_mano(tamano_pantalla)
+	$Tablero.position = $Tablero.position.round()
+	$Mano.position = $Mano.position.round()
+	$Fundaciones.position = $Fundaciones.position.round()
 
 
 func configurar_fundaciones(tamano_pantalla: Vector2) -> void:
@@ -117,7 +137,7 @@ func configurar_fundaciones(tamano_pantalla: Vector2) -> void:
 		fundacion.modelo = partida.fundaciones[numero_fundacion]
 
 		fundacion.size = Vector2(
-			TAMANO_CARTA.x - 15,
+			TAMANO_CARTA.x - 12,
 			TAMANO_CARTA.y
 		)
 
@@ -256,6 +276,84 @@ func mostrar_mano() -> void:
 		)
 
 		carta_visual.z_index = Z_MANO + numero_carta
+
+
+# Cartel modal con el estilo del juego. "botones" es una lista de
+# diccionarios: {"texto": "Aceptar", "accion": una_funcion}. La accion es
+# opcional; todo boton cierra el cartel.
+func mostrar_cartel(
+	titulo: String,
+	mensaje: String,
+	botones: Array
+) -> void:
+	# Capa por encima del resto de la interfaz.
+	var capa := CanvasLayer.new()
+	capa.layer = 20
+	add_child(capa)
+
+	# Fondo oscuro que tambien bloquea el mouse sobre el juego.
+	var oscurecer := ColorRect.new()
+	oscurecer.color = Color(0, 0, 0, 0.6)
+	oscurecer.mouse_filter = Control.MOUSE_FILTER_STOP
+	capa.add_child(oscurecer)
+	oscurecer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var centro := CenterContainer.new()
+	centro.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	capa.add_child(centro)
+	centro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var panel := PanelContainer.new()
+	var estilo := StyleBoxFlat.new()
+	estilo.bg_color = Color(0.03, 0.15, 0.09, 0.97)
+	estilo.border_color = COLOR_ORO
+	estilo.set_border_width_all(2)
+	estilo.set_corner_radius_all(16)
+	estilo.set_content_margin_all(30)
+	panel.add_theme_stylebox_override("panel", estilo)
+	centro.add_child(panel)
+
+	var contenido := VBoxContainer.new()
+	contenido.add_theme_constant_override("separation", 14)
+	panel.add_child(contenido)
+
+	var etiqueta_titulo := _crear_etiqueta(titulo, 26, 1.0)
+	etiqueta_titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	etiqueta_titulo.custom_minimum_size = Vector2(ANCHO_CARTEL, 0)
+	etiqueta_titulo.add_theme_color_override("font_color", COLOR_ORO_CLARO)
+	contenido.add_child(etiqueta_titulo)
+
+	var linea := ColorRect.new()
+	linea.color = Color(COLOR_ORO, 0.5)
+	linea.custom_minimum_size = Vector2(0, 2)
+	contenido.add_child(linea)
+
+	if mensaje != "":
+		var etiqueta_mensaje := _crear_etiqueta(mensaje, 18, 1.0)
+		etiqueta_mensaje.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		etiqueta_mensaje.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		etiqueta_mensaje.custom_minimum_size = Vector2(ANCHO_CARTEL, 0)
+		contenido.add_child(etiqueta_mensaje)
+
+	var fila := HBoxContainer.new()
+	fila.alignment = BoxContainer.ALIGNMENT_CENTER
+	fila.add_theme_constant_override("separation", 14)
+	contenido.add_child(fila)
+
+	for datos in botones:
+		var accion: Callable = datos.get("accion", Callable())
+
+		fila.add_child(_crear_boton(
+			datos["texto"],
+			_cerrar_cartel.bind(capa, accion)
+		))
+
+
+func _cerrar_cartel(capa: CanvasLayer, accion: Callable) -> void:
+	capa.queue_free()
+
+	if accion.is_valid():
+		accion.call()
 
 
 func mostrar_fundaciones() -> void:
@@ -543,6 +641,7 @@ func crear_botones_interfaz() -> void:
 
 	# Abajo a la izquierda: acciones de la partida.
 	var panel_izquierdo := VBoxContainer.new()
+	panel_izquierdo.add_theme_constant_override("separation", 8)
 	panel_izquierdo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	capa.add_child(panel_izquierdo)
 	_anclar_abajo(panel_izquierdo, false)
@@ -550,52 +649,197 @@ func crear_botones_interfaz() -> void:
 	panel_izquierdo.add_child(
 		_crear_boton("Guardar partida", guardar_partida)
 	)
-
 	panel_izquierdo.add_child(
 		_crear_boton("Crear nueva partida", confirmar_nueva_partida)
 	)
-
 	panel_izquierdo.add_child(
 		_crear_boton("Salir del juego", confirmar_salir)
 	)
 
 	# Abajo a la derecha: ordenamiento de la mano.
-	var panel_derecho := GridContainer.new()
-	panel_derecho.columns = 2
-	panel_derecho.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	capa.add_child(panel_derecho)
-	_anclar_abajo(panel_derecho, true)
-
-	panel_derecho.add_child(_crear_boton(
-		"Corazones", _ordenar_mano_por_palo.bind(Carta.Palo.CORAZONES)
-	))
-	panel_derecho.add_child(_crear_boton(
-		"Diamantes", _ordenar_mano_por_palo.bind(Carta.Palo.DIAMANTES)
-	))
-	panel_derecho.add_child(_crear_boton(
-		"Tréboles", _ordenar_mano_por_palo.bind(Carta.Palo.TREBOLES)
-	))
-	panel_derecho.add_child(_crear_boton(
-		"Picas", _ordenar_mano_por_palo.bind(Carta.Palo.PICAS)
-	))
-	panel_derecho.add_child(_crear_boton(
-		"Rojas primero", _ordenar_mano_por_color.bind(true)
-	))
-	panel_derecho.add_child(_crear_boton(
-		"Negras primero", _ordenar_mano_por_color.bind(false)
-	))
-	panel_derecho.add_child(_crear_boton(
-		"Por número", _ordenar_mano_por_numero
-	))
+	var panel_ordenamiento := _crear_panel_ordenamiento()
+	capa.add_child(panel_ordenamiento)
+	_anclar_abajo(panel_ordenamiento, true)
 
 
 func _crear_boton(texto: String, accion: Callable) -> Button:
 	var boton := Button.new()
 	boton.text = texto
-	boton.custom_minimum_size = Vector2(150, 40)
+	boton.custom_minimum_size = Vector2(190, 44)
 	boton.focus_mode = Control.FOCUS_NONE
+	boton.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	boton.pressed.connect(accion)
+
+	boton.add_theme_stylebox_override(
+		"normal", _estilo_boton(Color(0, 0, 0, 0.35), Color(COLOR_ORO, 0.7))
+	)
+	boton.add_theme_stylebox_override(
+		"hover", _estilo_boton(Color(0, 0, 0, 0.20), COLOR_ORO_CLARO)
+	)
+	boton.add_theme_stylebox_override(
+		"pressed", _estilo_boton(Color(0, 0, 0, 0.55), COLOR_ORO)
+	)
+	boton.add_theme_color_override("font_color", COLOR_TEXTO)
+	boton.add_theme_color_override("font_hover_color", Color.WHITE)
+	boton.add_theme_color_override("font_pressed_color", COLOR_TEXTO)
+	boton.add_theme_font_size_override("font_size", 17)
+
 	return boton
+
+
+func _estilo_boton(fondo: Color, borde: Color) -> StyleBoxFlat:
+	var estilo := StyleBoxFlat.new()
+	estilo.bg_color = fondo
+	estilo.border_color = borde
+	estilo.set_border_width_all(2)
+	estilo.set_corner_radius_all(10)
+	estilo.set_content_margin_all(10)
+	return estilo
+
+
+func _estilo_ficha(fondo: Color, borde: Color) -> StyleBoxFlat:
+	var estilo := StyleBoxFlat.new()
+	estilo.bg_color = fondo
+	estilo.border_color = borde
+	estilo.set_border_width_all(2)
+	estilo.set_corner_radius_all(TAMANO_FICHA / 2)
+	estilo.set_content_margin_all(9)
+	return estilo
+
+
+func _crear_etiqueta(texto: String, tamano: int, opacidad: float) -> Label:
+	var etiqueta := Label.new()
+	etiqueta.text = texto
+	etiqueta.add_theme_font_size_override("font_size", tamano)
+	etiqueta.add_theme_color_override(
+		"font_color", Color(COLOR_TEXTO, opacidad)
+	)
+	return etiqueta
+
+
+func _cargar_icono(nombre: String) -> Texture2D:
+	if nombre == "":
+		return null
+
+	var ruta: String = "res://assets/iconos/" + nombre + ".svg"
+
+	if not ResourceLoader.exists(ruta):
+		return null
+
+	return load(ruta) as Texture2D
+
+
+# Ficha redonda. Si no se encuentra el icono, muestra el texto alternativo.
+func _crear_ficha(
+	ayuda: String,
+	accion: Callable,
+	fondo: Color,
+	nombre_icono: String = "",
+	texto: String = ""
+) -> Button:
+	var boton := Button.new()
+	boton.custom_minimum_size = Vector2(TAMANO_FICHA, TAMANO_FICHA)
+	boton.tooltip_text = ayuda
+	boton.focus_mode = Control.FOCUS_NONE
+	boton.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	boton.pressed.connect(accion)
+
+	boton.add_theme_stylebox_override(
+		"normal", _estilo_ficha(fondo, COLOR_ORO)
+	)
+	boton.add_theme_stylebox_override(
+		"hover", _estilo_ficha(fondo.lightened(0.15), COLOR_ORO_CLARO)
+	)
+	boton.add_theme_stylebox_override(
+		"pressed", _estilo_ficha(fondo.darkened(0.15), COLOR_ORO)
+	)
+
+	var icono: Texture2D = _cargar_icono(nombre_icono)
+
+	if icono != null:
+		boton.icon = icono
+		boton.expand_icon = true
+		boton.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	else:
+		boton.text = texto
+
+	boton.add_theme_color_override("font_color", COLOR_NEGRO_FICHA)
+	boton.add_theme_color_override("font_hover_color", COLOR_NEGRO_FICHA)
+	boton.add_theme_color_override("font_pressed_color", COLOR_NEGRO_FICHA)
+	boton.add_theme_font_size_override("font_size", 16)
+
+	return boton
+
+
+func _crear_panel_ordenamiento() -> PanelContainer:
+	var panel := PanelContainer.new()
+
+	var estilo := StyleBoxFlat.new()
+	estilo.bg_color = Color(0, 0, 0, 0.30)
+	estilo.border_color = Color(COLOR_ORO, 0.6)
+	estilo.set_border_width_all(1)
+	estilo.set_corner_radius_all(14)
+	estilo.set_content_margin_all(14)
+	panel.add_theme_stylebox_override("panel", estilo)
+
+	var contenido := VBoxContainer.new()
+	contenido.add_theme_constant_override("separation", 6)
+	panel.add_child(contenido)
+
+	contenido.add_child(_crear_etiqueta("Ordenar mano", 20, 1.0))
+
+	# Fila 1: por palo
+	contenido.add_child(_crear_etiqueta("Por palo", 14, 0.7))
+
+	var fila_palos := HBoxContainer.new()
+	fila_palos.add_theme_constant_override("separation", 8)
+	contenido.add_child(fila_palos)
+
+	fila_palos.add_child(_crear_ficha(
+		"Corazones al inicio",
+		_ordenar_mano_por_palo.bind(Carta.Palo.CORAZONES),
+		COLOR_CREMA, "corazones", "C"
+	))
+	fila_palos.add_child(_crear_ficha(
+		"Diamantes al inicio",
+		_ordenar_mano_por_palo.bind(Carta.Palo.DIAMANTES),
+		COLOR_CREMA, "diamantes", "D"
+	))
+	fila_palos.add_child(_crear_ficha(
+		"Tréboles al inicio",
+		_ordenar_mano_por_palo.bind(Carta.Palo.TREBOLES),
+		COLOR_CREMA, "treboles", "T"
+	))
+	fila_palos.add_child(_crear_ficha(
+		"Picas al inicio",
+		_ordenar_mano_por_palo.bind(Carta.Palo.PICAS),
+		COLOR_CREMA, "picas", "P"
+	))
+
+	# Fila 2: por color y por numero
+	contenido.add_child(_crear_etiqueta("Por color o número", 14, 0.7))
+
+	var fila_otros := HBoxContainer.new()
+	fila_otros.add_theme_constant_override("separation", 8)
+	contenido.add_child(fila_otros)
+
+	fila_otros.add_child(_crear_ficha(
+		"Cartas rojas primero",
+		_ordenar_mano_por_color.bind(true),
+		COLOR_ROJO_FICHA
+	))
+	fila_otros.add_child(_crear_ficha(
+		"Cartas negras primero",
+		_ordenar_mano_por_color.bind(false),
+		COLOR_NEGRO_FICHA
+	))
+	fila_otros.add_child(_crear_ficha(
+		"Por número, de menor a mayor",
+		_ordenar_mano_por_numero,
+		COLOR_CREMA, "", "A-K"
+	))
+
+	return panel
 
 
 # Pega un contenedor a la esquina inferior izquierda o derecha.
@@ -651,16 +895,17 @@ func reordenar_mano_visual() -> void:
 
 
 func confirmar_nueva_partida() -> void:
-	var dialogo := ConfirmationDialog.new()
-	dialogo.title = "Nueva partida"
-	dialogo.dialog_text = "¿Empezar una nueva partida? Se perderá el progreso de la partida actual y la partida guardada."
-	dialogo.ok_button_text = "Aceptar"
-	dialogo.cancel_button_text = "Cancelar"
-	dialogo.confirmed.connect(_on_nueva_partida_presionado)
-	dialogo.canceled.connect(dialogo.queue_free)
-
-	add_child(dialogo)
-	dialogo.popup_centered()
+	mostrar_cartel(
+		"Crear nueva partida",
+		"Se perderá el progreso de la partida actual y también la partida guardada, si la hay.",
+		[
+			{"texto": "Cancelar"},
+			{
+				"texto": "Crear partida",
+				"accion": _on_nueva_partida_presionado
+			}
+		]
+	)
 
 
 func guardar_partida() -> void:
@@ -669,86 +914,47 @@ func guardar_partida() -> void:
 		return
 
 	if Guardado.guardar(partida):
-		mostrar_aviso("Partida guardada.")
+		mostrar_cartel(
+			"Partida guardada",
+			"La partida se guardó correctamente.",
+			[{"texto": "Aceptar"}]
+		)
 	else:
-		mostrar_aviso("No fue posible guardar la partida.")
+		mostrar_cartel(
+			"No se pudo guardar",
+			"No fue posible guardar la partida. El estado actual no se modificó.",
+			[{"texto": "Aceptar"}]
+		)
 
 
 func confirmar_salir() -> void:
-	var dialogo := ConfirmationDialog.new()
-	dialogo.title = "Salir del juego"
-	dialogo.dialog_text = "¿Salir del juego? Se perderá el progreso que no hayas guardado."
-	dialogo.ok_button_text = "Salir"
-	dialogo.cancel_button_text = "Cancelar"
-	dialogo.confirmed.connect(get_tree().quit)
-	dialogo.canceled.connect(dialogo.queue_free)
-
-	add_child(dialogo)
-	dialogo.popup_centered()
-
-
-func mostrar_aviso(texto: String) -> void:
-	var dialogo := AcceptDialog.new()
-	dialogo.title = "Guardar partida"
-	dialogo.dialog_text = texto
-	dialogo.ok_button_text = "Aceptar"
-	dialogo.confirmed.connect(dialogo.queue_free)
-	dialogo.canceled.connect(dialogo.queue_free)
-
-	add_child(dialogo)
-	dialogo.popup_centered()
+	mostrar_cartel(
+		"Salir del juego",
+		"Se perderá el progreso que no hayas guardado.",
+		[
+			{"texto": "Cancelar"},
+			{"texto": "Salir", "accion": get_tree().quit}
+		]
+	)
 
 
 func mostrar_resultado(mensaje: String) -> void:
 	partida_terminada = true
 
-	# Capa propia, por encima de todo lo demas.
-	var capa := CanvasLayer.new()
-	capa.layer = 10
-	add_child(capa)
-
-	# Fondo oscuro que tambien bloquea el mouse sobre el tablero.
-	var oscurecer := ColorRect.new()
-	oscurecer.color = Color(0, 0, 0, 0.55)
-	oscurecer.mouse_filter = Control.MOUSE_FILTER_STOP
-	capa.add_child(oscurecer)
-	oscurecer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-
-	var centro := CenterContainer.new()
-	capa.add_child(centro)
-	centro.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-
-	var panel := PanelContainer.new()
-	centro.add_child(panel)
-
-	var margen := MarginContainer.new()
-	margen.add_theme_constant_override("margin_left", 50)
-	margen.add_theme_constant_override("margin_right", 50)
-	margen.add_theme_constant_override("margin_top", 40)
-	margen.add_theme_constant_override("margin_bottom", 40)
-	panel.add_child(margen)
-
-	var contenido := VBoxContainer.new()
-	contenido.add_theme_constant_override("separation", 20)
-	margen.add_child(contenido)
-
-	var titulo := Label.new()
-	titulo.text = mensaje
-	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	titulo.add_theme_font_size_override("font_size", 36)
-	contenido.add_child(titulo)
-
-	var boton_nueva := Button.new()
-	boton_nueva.text = "Crear nueva partida"
-	boton_nueva.custom_minimum_size = Vector2(280, 50)
-	boton_nueva.pressed.connect(_on_nueva_partida_presionado)
-	contenido.add_child(boton_nueva)
-
-	var boton_salir := Button.new()
-	boton_salir.text = "Salir del juego"
-	boton_salir.custom_minimum_size = Vector2(280, 50)
-	boton_salir.pressed.connect(get_tree().quit)
-	contenido.add_child(boton_salir)
+	mostrar_cartel(
+		mensaje,
+		"",
+		[
+			{
+				"texto": "Crear nueva partida",
+				"accion": _on_nueva_partida_presionado
+			},
+			{
+				"texto": "Salir del juego",
+				"accion": get_tree().quit
+			}
+		]
+	)
 
 
 func _on_nueva_partida_presionado() -> void:
@@ -780,7 +986,7 @@ func actualizar_indices_mano(animar: bool = false) -> void:
 	var ancho_actual: float = (
 		TAMANO_CARTA.x + maxi(cantidad - 1, 0) * SEPARACION_MANO
 	)
-	var desplazamiento: float = (ancho_completo - ancho_actual) / 2.0
+	var desplazamiento: float = floorf((ancho_completo - ancho_actual) / 2.0)
 
 	if animar and cantidad > 0:
 		tween_mano = create_tween().set_parallel(true)
@@ -839,7 +1045,7 @@ func calcular_posiciones_y(columna: Columna) -> Array[float]:
 	var y: float = 0.0
 
 	for carta in columna.cartas:
-		posiciones.append(y)
+		posiciones.append(roundf(y))
 		y += pasos.y if carta.visible else pasos.x
 
 	return posiciones

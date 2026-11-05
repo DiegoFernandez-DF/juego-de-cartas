@@ -19,7 +19,7 @@ var marco_visible: bool = false:
 
 # El dibujo de la carta es mas angosto que su recuadro (140), igual
 # que en las fundaciones (125). Este margen alinea el marco con la carta.
-const MARGEN_MARCO = 7.5
+const MARGEN_MARCO = 6.0
 
 
 func _draw() -> void:
