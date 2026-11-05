@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://jlubr6jwg54p"
-path="res://.godot/imported/Dorso.png-c0ab259cdf3bb6c963e910be58835dba.ctex"
+uid="uid://dyypakd1amf6k"
+path="res://.godot/imported/dorso_burdeos.png-072fe782fc502fc9ce1707f5371edd80.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/cartas/dorso/Dorso.png"
-dest_files=["res://.godot/imported/Dorso.png-c0ab259cdf3bb6c963e910be58835dba.ctex"]
+source_file="res://assets/cartas/dorso/dorso_burdeos.png"
+dest_files=["res://.godot/imported/dorso_burdeos.png-072fe782fc502fc9ce1707f5371edd80.ctex"]
 
 [params]
 
