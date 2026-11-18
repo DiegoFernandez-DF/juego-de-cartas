@@ -43,17 +43,6 @@ func _crear_tablero_vacio() -> void:
 			10
 		)
 
-	# Zona de la mano.
-	var x_mano: float = roundf((pantalla.x - ANCHO_MANO) / 2.0)
-	var y_mano: float = pantalla.y - ALTO_CARTA - MARGEN_INFERIOR_MANO
-	var ancho_cartas_mano: float = ANCHO_MANO - 12.0
-
-	_crear_marco(
-		Vector2(x_mano + MARGEN_CARTA - 16.0, y_mano - 12.0),
-		Vector2(ancho_cartas_mano + 32.0, ALTO_CARTA + 18.0),
-		16
-	)
-
 
 func _crear_marco(posicion: Vector2, tamano: Vector2, radio: int) -> void:
 	var estilo := StyleBoxFlat.new()
