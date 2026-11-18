@@ -8,19 +8,6 @@ El juego toma como referencia el solitario clásico y propone una distribución 
 
 El proyecto se desarrolla de forma individual, con una interfaz 2D en español y Windows como plataforma objetivo.
 
-## Estado del proyecto
-
-El Sprint 1 estableció la estructura inicial de una partida: modelo de cartas, barajado, distribución inicial y representación visual.
-
-El Sprint 2 incorpora una partida jugable de principio a fin:
-
-* Movimiento de cartas y secuencias entre columnas, con validación de las jugadas y revelado de las cartas ocultas.
-* Uso de las cartas de la mano hacia columnas y fundaciones.
-* Fundaciones construidas desde el As hasta el Rey. El palo de cada una se define con el primer As colocado y su carta superior puede devolverse al tablero.
-* Ordenamiento de la mano por número, color o palo.
-* Detección de partida completada o bloqueada, con pantalla de resultado.
-* Menú principal, y guardado y carga de la partida.
-
 ## Tecnologías
 
 * Motor: Godot 4.7.
@@ -48,14 +35,28 @@ Los principales scripts se organizan según las responsabilidades de cada compon
 * `Carta_visual.gd`, `Columna_visual.gd`, `Fundacion_visual.gd` y `Marco.gd`: representación visual e interacción con el mouse.
 * `Juego.gd`: coordinación de los elementos, sus movimientos y su disposición visual.
 
-## Instalación y ejecución
+Instalación y ejecución
+
+El proyecto incluye un ejecutable para Windows (.exe), por lo que no es necesario instalar Godot para jugar.
+
+1. Descargar el ejecutable del juego.
+2. Abrir el archivo .exe.
+3. El juego inicia en el menú principal.
+
+Aviso: al abrir el ejecutable, Windows Defender u otro antivirus podría mostrar una advertencia o bloquear su ejecución. Esto ocurre porque el ejecutable no cuenta con una firma digital reconocida. 
+
+También es posible ejecutar el proyecto desde Godot:
 
 1. Instalar Godot 4.7.
 2. Descargar o clonar el repositorio.
-3. Abrir Godot e importar el proyecto seleccionando el archivo `project.godot`.
-4. Ejecutar el proyecto desde el editor. El juego inicia en el menú principal.
+3. Abrir Godot e importar el proyecto seleccionando el archivo project.godot.
+4. Ejecutar el proyecto desde el editor.
 
-La primera apertura puede requerir que Godot importe los recursos del proyecto. La partida guardada se almacena en `user://partida_guardada.json`.
+La partida se guarda automáticamente en un archivo local llamado partida_guardada.json, ubicado en la carpeta de datos de usuario de Godot:
+
+%APPDATA%\Roaming\Godot\app_userdata\Juego de Cartas\partida_guardada.json
+
+Este archivo se conserva entre ejecuciones y permite continuar una partida guardada desde el menú principal.
 
 ## Autoría
 
