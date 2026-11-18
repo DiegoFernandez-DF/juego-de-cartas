@@ -805,6 +805,7 @@ func _estilo_ficha(fondo: Color, borde: Color) -> StyleBoxFlat:
 	estilo.bg_color = fondo
 	estilo.border_color = borde
 	estilo.set_border_width_all(2)
+	@warning_ignore("integer_division")
 	estilo.set_corner_radius_all(TAMANO_FICHA / 2)
 	estilo.set_content_margin_all(9)
 	return estilo
